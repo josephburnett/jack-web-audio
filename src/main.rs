@@ -1,3 +1,28 @@
+extern crate jack;
+
+use jack::prelude as j;
+use jack::traits::*;
+use std::io;
+
+/// sudo jack_connect SuperCollider:out_1 jack-web-audio:jwa_in_l
+/// sudo jack_connect SuperCollider:out_2 jack-web-audio:jwa_in_r
 fn main() {
-    println!("Hello, world!");
+    let (client, _status) = j::Client::open("jack-web-audio", j::client_options::NO_START_SERVER)
+        .unwrap();
+    let in_l = client.register_port("jwa_in_l", j::AudioInSpec::default()).unwrap();
+    let in_r = client.register_port("jwa_in_r", j::AudioInSpec::default()).unwrap();
+    let process = move |_: &j::WeakClient, ps: &j::ProcessScope| -> jack::JackControl {
+        let l = j::AudioInPort::new(&in_l, ps);
+        let r = j::AudioInPort::new(&in_r, ps);
+        let l_sum: f32 = l.iter().sum();
+        let r_sum: f32 = r.iter().sum();
+        if l_sum > 1_f32 || r_sum > 1_f32 {
+            println!("thump ({}, {})", l_sum, r_sum);
+        }
+        j::JackControl::Continue
+    };
+    let handler = j::ProcessHandler::new(process);
+    let active_client = client.activate(handler).unwrap();
+    let mut user_input = String::new();
+    io::stdin().read_line(&mut user_input).ok();
 }
