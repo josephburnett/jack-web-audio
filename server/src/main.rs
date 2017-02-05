@@ -1,17 +1,26 @@
 extern crate jack;
+extern crate uuid;
 extern crate ws;
 
 use jack::prelude as j;
 use jack::traits::*;
+
+use std::collections::HashMap;
 use std::io;
+use std::sync::Arc;
+use std::sync::RwLock;
+
+use uuid::Uuid;
 
 use ws::{listen, Handler, Sender, Result, Message, Handshake, CloseCode, Error};
 
-struct Server {
+struct Server<'a> {
     out: Sender,
+    id: String,
+    clients: Arc<RwLock<&'a HashMap<String, &'a Server<'a>>>>,
 }
 
-impl Handler for Server {
+impl<'a> Handler for Server<'a> {
     fn on_open(&mut self, _: Handshake) -> Result<()> {
         println!("open");
         Ok(())
@@ -38,14 +47,15 @@ fn main() {
     let process = move |_: &j::WeakClient, ps: &j::ProcessScope| -> jack::JackControl {
         let l = j::AudioInPort::new(&in_l, ps);
         let r = j::AudioInPort::new(&in_r, ps);
-        let l_sum: f32 = l.iter().sum();
-        let r_sum: f32 = r.iter().sum();
-        if l_sum > 1_f32 || r_sum > 1_f32 {
-            println!("thump ({}, {})", l_sum, r_sum);
-        }
         j::JackControl::Continue
     };
     let handler = j::ProcessHandler::new(process);
     let active_client = client.activate(handler).unwrap();
-    listen("0.0.0.0:8003", |out| { Server { out: out }}).unwrap();
+
+    let clients = HashMap::new();
+    let mut shared_clients = Arc::new(RwLock::new(&clients));
+    listen("0.0.0.0:8003", |out| {
+        let id = Uuid::new_v4().hyphenated().to_string();
+        Server{ out: out, clients: shared_clients.clone(), id: id }
+    }).unwrap();
 }
