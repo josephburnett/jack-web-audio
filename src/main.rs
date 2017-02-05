@@ -1,8 +1,32 @@
 extern crate jack;
+extern crate ws;
 
 use jack::prelude as j;
 use jack::traits::*;
 use std::io;
+
+use ws::{listen, Handler, Sender, Result, Message, Handshake, CloseCode, Error};
+
+struct Server {
+    out: Sender,
+}
+
+impl Handler for Server {
+    fn on_open(&mut self, _: Handshake) -> Result<()> {
+        println!("open");
+        Ok(())
+    }
+    fn on_message(&mut self, _: Message) -> Result<()> {
+        println!("message");
+        Ok(())
+    }
+    fn on_close(&mut self, _: CloseCode, _: &str) {
+        println!("close");
+    }
+    fn on_error(&mut self, _: Error) {
+        println!("error");
+    }
+}
 
 /// sudo jack_connect SuperCollider:out_1 jack-web-audio:jwa_in_l
 /// sudo jack_connect SuperCollider:out_2 jack-web-audio:jwa_in_r
@@ -23,6 +47,5 @@ fn main() {
     };
     let handler = j::ProcessHandler::new(process);
     let active_client = client.activate(handler).unwrap();
-    let mut user_input = String::new();
-    io::stdin().read_line(&mut user_input).ok();
+    listen("0.0.0.0:8003", |out| { Server { out: out }}).unwrap();
 }

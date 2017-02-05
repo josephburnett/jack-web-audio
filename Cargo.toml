@@ -5,3 +5,4 @@ authors = ["Joseph Burnett <josephburnett79@gmail.com>"]
 
 [dependencies]
 jack = "0.4.0"
+ws = "0.5.3"
